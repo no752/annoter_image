@@ -17,6 +17,7 @@ button {
 .blocTexte {  /* le style d'un bloc de texte */
     position: absolute;
     border : 1px solid black;
+    padding : 0.3em;
     min-width : 1em;
 }
 
