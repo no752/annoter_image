@@ -161,9 +161,9 @@ const menuContextuel = {
         evt.stopPropagation();
         let menu = document.getElementById("menuContextuelTexte");
         menu.classList.replace("cacher", "afficher");  // le menu est affiché
-        let i = Math.round(evt.clientY) - 10;
+        let i = Math.round(evt.clientY + window.scrollY) - 10;
         menu.style.top = i > 0 ? i.toString() + "px" : "0px";  // fixe la position Y, qui ne doit pas être < 0
-        i = Math.round(evt.clientX) - 10;
+        i = Math.round(evt.clientX + window.scrollX) - 10;
         menu.style.left = i > 0 ? i.toString() + "px" : "0px";  // fixe la position X, qui ne doit pas être < 0
         if (evt.currentTarget.tagName !== "IMG") {  // le menu n'est pas ouvert depuis l'image
             menuContextuel.blocTexte = evt.currentTarget;  // donc il est ouvert depuis un bloc de texte, qui est enregistré
@@ -282,25 +282,24 @@ function ajouterTexte(evt) {
         1. mousedown
         2. mouseup
         3. click
-        D'une part, le click sert à activer ou fermer une fenêtre ; d'autre part, la gestion de "mousedown" est nécessaire
-        pour initialiser le déplacement de la fenêtre, en l'activant au préalable. Donc, le traitement de l'évènement "click"
-        est inclus dans celui du "mousedown".
-        Finalement, les fenêtres sont gérées avec 3 évènements, dont l'ordre de déclenchement est :
+        Le déplacement des fenêtres est géré avec 3 évènements, dont l'ordre de déclenchement est :
         1. mousedown
         2. mousemove
         3. mouseup
-        Pour chacun, la phase de bouillonement est inutile puisqu'ils sont déclarés sur l'élt représentant la fenêtre. 
+        Pour chacun, la phase de bouillonement est inutile puisqu'ils sont déclarés sur l'élément <div>.
+        Les coordonnées du coin en haut à gauche du <div> doivent tenir compte du scroll, qui aurait eu lieu sur la page. 
         Le bloc de texte est ajouté avant le bloc du menu contextuel. Ainsi, ce dernier est en surimpression sur
         les autres blocs. */
     evt.stopPropagation();
     let div = document.createElement("DIV");
     div.classList.add("blocTexte");
-    div.style.top = Math.round(evt.clientY).toString() + "px";
-    div.style.left = Math.round(evt.clientX).toString() + "px";
+    div.style.top = Math.round(evt.pageY).toString() + "px";
+    div.style.left = Math.round(evt.pageX).toString() + "px";
     div.setAttribute("contenteditable", "true");
     div.addEventListener("mousedown", deplacement.commencer);
     div.addEventListener("mousemove", deplacement.poursuivre);
     div.addEventListener("mouseup", deplacement.terminer);
+    div.addEventListener("mouseleave", deplacement.terminer);
     div.addEventListener("contextmenu", menuContextuel.afficher);
     document.getElementById("menuContextuelTexte").before(div);
 }
@@ -320,15 +319,15 @@ const deplacement = {  // groupe les fonctions qui gèrent le déplacement des b
     
     commencer : function(evt) {
         /*  Le déplacement commence avec l'évènement "mousedown". 
-            Attention : cet évènement est aussi déclenché par l'appel au menu contextuel avec la souris. */
+            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown" puis "contextmenu". */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
         if (evt.button === 2) {  // appel au menu contextuel avec la souris
             return;              // donc ce n'est pas le début du déplacement
         }
         deplacement.poursuite = true;  // marque le début du déplacement
         let rect = evt.currentTarget.getBoundingClientRect();  // les coord et les dim du bloc à déplacer
-        deplacement.x = rect.x;
-        deplacement.y = rect.y;
+        deplacement.x = Math.round(rect.x + window.scrollX);
+        deplacement.y = Math.round(rect.y + window.scrollY);
     },
     
     poursuivre : function(evt) {
