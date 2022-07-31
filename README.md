@@ -11,6 +11,9 @@ Le but est de coller une image dans un page html pour positionner des blocs de t
 8. L'image est ensuite collée dans un autre logiciel, comme un traitement de texte par exemple.
 
 A l'étape 2), si l'application est déjà ouverte dans un onglet, alors il est possible de le dupliquer pour obtenir le même comportement.
+
+A l'étape 7), on suppose que la partie sélectionnée de l'image est significative si sa surface est > à 100px^2 ; dans le cas contraire la capture est annulée.
+
 Le menu contextuel permet d'augmenter ou de diminuer la taille du texte et l'épaisseur de la bordure, de modifier la couleur de l'arrière-plan et du texte, de supprimer le bloc.
 La dernière option sélectionne et copie une partie de l'image dans le presse-papier.
 # Quelles sont les autorisations nécessaires ?
