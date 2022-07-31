@@ -312,20 +312,36 @@ const menuContextuel = {
 
 const captureEcran = {
 
-    selection : false,  // le rectangle pour border la zone à séléectioner est en cours de création 
-    rect : null,  // le bloc délimitant le rectangle à capturer
-    rectX : 0,  // l'abscisse du coin en haut à gauche
-    rectY : 0,  // l'ordonnée du coin en haut à gauche
-    rectW : 0,  // la largeur de la surface
-    rectH : 0,  // la hauteur de la surface
-    
-    executer : function(evt) {
-        /*  Remplace les blocs de texte en les dessinant dans le <canvas>, permet de sélectionner une partie
-            de l'image et de copier cette image dans le presse-papier. */
+    _selection : false,  // le rectangle pour border la zone à séléectioner est en cours de création 
+    _rect : null,  // le bloc délimitant le rectangle à capturer
+    _rectX : 0,  // l'abscisse du coin en haut à gauche
+    _rectY : 0,  // l'ordonnée du coin en haut à gauche
+    _rectW : 0,  // la largeur de la surface
+    _rectH : 0,  // la hauteur de la surface
+      
+    creer : function() {
+        /*  Initialise la capture d'écran en passant en plein écran si nécessaire. */
+        if (document.fullscreenElement) {  // le mode pein écran est déjà actif
+            captureEcran._creer();  // donc la capture commence
+        }
+        else {  // le mode plein écran n'est pas actif
+            document.body.requestFullscreen()  // donc on l'active avant de commencer la capture d'écran
+            .then(
+                function() {
+                    /*  Le mode plein écran est actif. */
+                    captureEcran._creer();  // donc la capture commence
+                }
+            )
+            .catch(
+                function (err) {
+                    console.log("impossible de passer en plein écran :", err.name, err.message);
+                }
+            );
+        }
     },
     
-    creer : function(evt) {
-        /*  Prendre une copie d'une partie de l'écran.
+    _creer : function() {
+        /*  Prendre une copie de la partie qui a été sélectionnée,  dans l'écran.
             Pour sélectionner la partie de l'écran à capturer dans un rectangle, les coordonnées du coin supérieur/gauche
             sont marquées par celles du 1er évènement "mousedown". En maintenant le bouton de la souris appuyé, le curseur
             est déplacé vers le coin inférieur/droit ; l'évènement "mousemove" renvoie les coordonnées du curseur pour tracer
@@ -335,7 +351,10 @@ const captureEcran = {
             D'autre part, si ces évènements sont écoutés sur le rectangle alors la sélection risque d'être stoppée puisque 
             le curseur doit rester sur la bordure du rectangle ; par conséquent, l'écoute est réalisée sur <BODY> qui est 
             l'ascendant du rectangle.
-            L'id du rectangle est "captureRect". */
+            L'id du rectangle est "captureRect". 
+            La sélection ne permet de faire défiler automatiquement l'écran pour étendre la zone à des parties invisibles. 
+            Cela implique que le mode plein écran est activé avant la sélection.*/
+            
         // interrompt l'écoute des évènement "mousedown", "mousemove" et "mouseup" sur les blocs de texte :
         for (let b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
             b.removeEventListener("mousedown", deplacement.commencer);
@@ -343,14 +362,14 @@ const captureEcran = {
             b.removeEventListener("mouseup", deplacement.terminer);
         }
         // Remplace les blocs de texte en les dessinant dans le <CANVAS> :
-        captureEcran.dessinerTexte();
+        captureEcran._dessinerTexte();
         // écoute les évènement "mousedown", "mousemove" et "mouseup" sur <body> :
-        document.body.addEventListener("mousedown", captureEcran.commencer);
-        document.body.addEventListener("mousemove", captureEcran.selectionner);
-        document.body.addEventListener("mouseup", captureEcran.terminer);
+        document.body.addEventListener("mousedown", captureEcran._commencer);
+        document.body.addEventListener("mousemove", captureEcran._selectionner);
+        document.body.addEventListener("mouseup", captureEcran._terminer);
     },
 
-    commencer : function(evt) {
+    _commencer : function(evt) {
         /*  L'évènement "mousedown" marque le début de la création du rectangle qui définit la zone de l'image
             à capturer.. 
             Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown", puis "contextmenu". */
@@ -358,61 +377,74 @@ const captureEcran = {
         if (evt.button === 2) {  // appel au menu contextuel avec la souris
             return;              // donc ce n'est pas le début de la création du rectangle
         }
-        captureEcran.selection = true;  // marque le début de la sélection
-        captureEcran.rectX = evt.clientX + window.scrollX;
-        captureEcran.rectY = evt.clientY + window.scrollY;
-        captureEcran.rect = document.createElement("DIV");
-        captureEcran.rect.id = "captureRect";
-        captureEcran.rect.style.position = "absolute";
-        captureEcran.rect.style.border = "3px solid black";
-        captureEcran.rect.style.left = captureEcran.rectX.toString() + "px";
-        captureEcran.rect.style.top = captureEcran.rectY.toString() + "px";
-        document.body.append(captureEcran.rect);
+        captureEcran._selection = true;  // marque le début de la sélection
+        captureEcran._rectX = evt.clientX + window.scrollX;
+        captureEcran._rectY = evt.clientY + window.scrollY;
+        captureEcran._rect = document.createElement("DIV");
+        captureEcran._rect.id = "captureRect";
+        captureEcran._rect.style.position = "absolute";
+        captureEcran._rect.style.border = "3px solid black";
+        captureEcran._rect.style.left = captureEcran._rectX.toString() + "px";
+        captureEcran._rect.style.top = captureEcran._rectY.toString() + "px";
+        document.body.append(captureEcran._rect);
     },
     
-    selectionner : function(evt) {
+    _selectionner : function(evt) {
         /*  La sélection continue avec l'évènement "mousemove". */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
-        if (captureEcran.selection) {  // la sélection a commencé
-            captureEcran.rectW += evt.movementX;  // ajoute l'écart l'ancienne position en x, du pointeur de la souris
-            captureEcran.rectH += evt.movementY;  // ajoute l'écart l'ancienne position en y, du pointeur de la souris
-            captureEcran.rect.style.width = captureEcran.rectW.toString() + "px";
-            captureEcran.rect.style.height = captureEcran.rectH.toString() + "px";
+        if (captureEcran._selection) {  // la sélection a commencé
+            captureEcran._rectW += evt.movementX;  // ajoute l'écart l'ancienne position en x, du pointeur de la souris
+            captureEcran._rectH += evt.movementY;  // ajoute l'écart l'ancienne position en y, du pointeur de la souris
+            captureEcran._rect.style.width = captureEcran._rectW.toString() + "px";
+            captureEcran._rect.style.height = captureEcran._rectH.toString() + "px";
         }
     },
     
-    terminer : function(evt) {
+    _terminer : function(evt) {
         /*  L'évènement "mouseup" marque la fin de la création du rectangle qui sélectionne la partie de l'image
             à capturer. Cette dernière donne sa taille au <canvas>, puis remplace l'image précédente. 
+            La capture est réalisée en mode plein écran (voir creer()) ; donc, on revient à l'écran "normal".
+            On suppose que la partie de l'image sélectionnée est significative si sa surface est > à 100px^2 ; dans le cas
+            contraire la capture est annulée.
             Important : 
             En redéfinissant la taille du canvas, l'ancienne image est effacée.
             La taille doit être redéfinie avant de copier la nouvelle image. */
+        function reinit() {
+            /* réinitialise les paramètres de la capture. */
+            captureEcran._rect = null;
+            captureEcran._rectX = 0;
+            captureEcran._rectY = 0;
+            captureEcran._rectW = 0;
+            captureEcran._rectH = 0; 
+        }
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement
-        captureEcran.selection = false;  // marque la fin de la sélection
+        captureEcran._selection = false;  // marque la fin de la sélection
         // stoppe l'écoute des évènement "mousedown", "mousemove" et "mouseup" sur le <body> :
-        document.body.removeEventListener("mousedown", captureEcran.commencer);
-        document.body.removeEventListener("mousemove", captureEcran.selectionner);
-        document.body.removeEventListener("mouseup", captureEcran.terminer);
-        // remplace l'image du <canvas> par la sélection :
-        let c = document.getElementById("canvas");
-        let ctx = c.getContext("2d");
-        let nvImg = ctx.getImageData(captureEcran.rectX, captureEcran.rectY, captureEcran.rectW, captureEcran.rectH);
-        c.width = captureEcran.rectW;  // redéfinit la largeur du <canvas>
-        c.height = captureEcran.rectH;  // redéfinit la hauteur du <canvas>
-        //ctx.clearRect(0, 0, c.width, c.height);  // efface l'image du canvas
-        ctx.putImageData(nvImg, 0, 0);  // la partie de l'image qui a été sélectionnée est mise dans le canvas
+        document.body.removeEventListener("mousedown", captureEcran._commencer);
+        document.body.removeEventListener("mousemove", captureEcran._selectionner);
+        document.body.removeEventListener("mouseup", captureEcran._terminer);
         document.getElementById("captureRect").remove();  // le cadre représentant la surface est supprimé
-        // réinitialise les paramètres de la capture :
-        captureEcran.rect = null;
-        captureEcran.rectX = 0;
-        captureEcran.rectY = 0;
-        captureEcran.rectW = 0;
-        captureEcran.rectH = 0; 
-        // copie l'image dans le presse-papier :
-        captureEcran.copier();
+        if (captureEcran._rectW * captureEcran._rectH > 100) {  // c'est un grand rectangle car la surface est > 100px^2
+            // donc on remplace l'image du <canvas> par la sélection :
+            let c = document.getElementById("canvas");
+            let ctx = c.getContext("2d");
+            let nvImg = ctx.getImageData(captureEcran._rectX, captureEcran._rectY, captureEcran._rectW, captureEcran._rectH);
+            c.width = captureEcran._rectW;  // redéfinit la largeur du <canvas>
+            c.height = captureEcran._rectH;  // redéfinit la hauteur du <canvas>
+            ctx.putImageData(nvImg, 0, 0);  // la partie de l'image qui a été sélectionnée est mise dans le canvas
+            reinit();
+            captureEcran._copier();  // copie l'image dans le presse-papier
+        }
+        else {  // la capture a été annulée car c'est un petit rectangle
+            reinit();
+        }
+        // quitte le mode plain écran :
+        if (document.fullscreenElement) {  // le plein écran est actif
+            document.exitFullscreen();     // donc on le quitte
+        }
     },
     
-    copier : function(evt) {
+    _copier : function(evt) {
         /*  L'image du canvas est copiée dans le presse-papier. */
         document.getElementById("canvas").toBlob(  // transforme le <CANVAS> en <IMG>
             function(blob) {
@@ -436,7 +468,7 @@ const captureEcran = {
         );
     },
     
-    dessinerTexte : function() {
+    _dessinerTexte : function() {
         /*  Les blocs <div> de texte sont dessinés sur le <canvas>.
             1er cas : il y a une seule ligne de texte
             La propriété .textContent renvoie cette ligne
@@ -587,9 +619,9 @@ const deplacement = {  // groupe les fonctions qui gèrent le déplacement des b
         Donc, la nouvelle position du coin supérieur gauche est : (x + "movementX", y + "movementY").
         Les propriétés window.scrollX et window.scrollY permettent de prendre en compte les scrolls qui ont eu lieu
         sur la page. */
-    poursuite : false,  
-    x : 0,  // la valeur de la propriété "left" du coin supérieur gauche de <div>
-    y : 0,  // la valeur de la propriété "top" du coin supérieur gauche de <div>
+    _poursuite : false,  
+    _x : 0,  // la valeur de la propriété "left" du coin supérieur gauche de <div>
+    _y : 0,  // la valeur de la propriété "top" du coin supérieur gauche de <div>
     
     commencer : function(evt) {
         /*  Le déplacement commence avec l'évènement "mousedown". 
@@ -598,27 +630,27 @@ const deplacement = {  // groupe les fonctions qui gèrent le déplacement des b
         if (evt.button === 2) {  // appel au menu contextuel avec la souris
             return;              // donc ce n'est pas le début du déplacement
         }
-        deplacement.poursuite = true;  // marque le début du déplacement
+        deplacement._poursuite = true;  // marque le début du déplacement
         let rect = evt.currentTarget.getBoundingClientRect();  // les coord et les dim du bloc à déplacer
-        deplacement.x = Math.round(rect.x + window.scrollX);
-        deplacement.y = Math.round(rect.y + window.scrollY);
+        deplacement._x = Math.round(rect.x + window.scrollX);
+        deplacement._y = Math.round(rect.y + window.scrollY);
     },
     
     poursuivre : function(evt) {
         /*  Le déplacement continue avec l'évènement "mousemove". */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
-        if (deplacement.poursuite) {  // le déplacement a commencé
-            deplacement.x += evt.movementX;  // ajoute l'écart l'ancienne position en x, du pointeur de la souris
-            deplacement.y += evt.movementY;  // ajoute l'écart l'ancienne position en y, du pointeur de la souris
-            evt.currentTarget.style.top = deplacement.y.toString() + "px";
-            evt.currentTarget.style.left = deplacement.x.toString() + "px";
+        if (deplacement._poursuite) {  // le déplacement a commencé
+            deplacement._x += evt.movementX;  // ajoute l'écart l'ancienne position en x, du pointeur de la souris
+            deplacement._y += evt.movementY;  // ajoute l'écart l'ancienne position en y, du pointeur de la souris
+            evt.currentTarget.style.top = deplacement._y.toString() + "px";
+            evt.currentTarget.style.left = deplacement._x.toString() + "px";
         }
     },
     
     terminer : function(evt) {
         /*  Le déplacement est terminé avec l'évènement "mouseup". */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
-        deplacement.poursuite = false;  // marque la fin du déplacement
+        deplacement._poursuite = false;  // marque la fin du déplacement
     }
 }
 
