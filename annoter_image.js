@@ -3,6 +3,34 @@
 window.addEventListener("load", function() { 
 "use strict";
 
+/*  Pour sélectionner une partie de l'image à capturer, le seul moyen est d'inclure l'image dans un <CANVAS>.
+    Celui-ci est simplement le tableau des pixels qui composent l'image.
+    Par conséquent, les blocs de texte seront dessinés sur l'image. Cela implique que la taille de la police
+    est mesurée en pixels. */
+const 
+tailleTexteDefaut = 16,  // la taille du texte par défaut en pixels
+paddingTexte = 5,  // le padding des blocs de texte
+facteurHauteurLigne = 1.5,  // hauteur d'une ligne = facteurHauteurLigne * tailleTexteDefaut px
+epaisseurBordure = 2;  // l'épaisseur par défaut de la bordures des blocs de texte, en pixels
+
+/*  Si les styles CSS sont issus d'une feuille externe alors la propriété document.styleSheets[0].cssRules ne renvoie
+    pas les règles. Une solution est d'inclure les styles sont inclus dans la page html avec 
+    <head>...<style> les styles </style>...</head>. Ma compréhension est que .cssRules ne fonctionne pas avec une feuille
+    externe sur le domaine file:///. Donc, les styles sont gérés dans la page html. */ 
+//document.body.style.fontSize = tailleTexteDefaut + "px";  // la taille par défaut du texte est défini sur <BODY>
+
+creerCssDefaut();
+
+
+function creerCssDefaut() {
+    /*  Définit des styles par défaut en fonction des constantes du script. 
+        La règle 0 définit les styles de <BODY>.
+        La règle 3 définit les styles des blocs de texte <DIV>. */
+    var css = document.styleSheets[0].cssRules;  // les règles de style
+    css[0].styleMap.set("font-size", tailleTexteDefaut.toString() + "px");  // la taille par défaut du texte est défini sur <BODY>
+    css[0].styleMap.set("line-height", facteurHauteurLigne);
+    css[3].styleMap.set("padding", paddingTexte.toString() + "px");  // le padding des blocs de texte
+}
 
 // le navigateur a-t-il la permission de lire le presse-papier ?
 navigator.permissions.query({ name: "clipboard-read" })
@@ -57,9 +85,9 @@ function afficherErreur(err) {
     f.children[1].append(document.createTextNode(err));
     f.append(document.createElement("A"));
     f.children[2].append(document.createTextNode("Les navigateurs supportant l'API clipboard."));
-    f.children[2].href = "https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API";
+    f.children[2].href = "https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API"; 
     f.children[2].target = "_blank";
-    document.body.append(f);
+    document.body.prepend(f);  // l'erreur est affichée dès le début du document (après <nody>)
 }
 
 
@@ -74,25 +102,27 @@ const menuContextuel = {
     
     creer : function() {
         /*  Le menu contextuel est un élément <div> proposant les options pour modifier le style css d'un ou
-            plusieurs blocs. L'id de cet élément <div> est : "menuContextuelTexte". 
+            plusieurs blocs. L'id de cet élément <div> est : "menuContextuel". 
             Certains descendants du <div> ont un attribut data-modification-css dont la valeur est une fonction
             qui modifie un style. */
         let menu = document.createElement("DIV");
-        menu.classList.add("menuContextuelTexte");
+        menu.classList.add("menuContextuel");
         menu.classList.add("cacher");  // le menu contextuel toujours caché au départ
-        menu.id = "menuContextuelTexte";
+        menu.id = "menuContextuel";
         menu.addEventListener("mouseleave", menuContextuel.cacher);
-        menu.addEventListener("click", menuContextuel.modifierCSS);
+        menu.addEventListener("click", menuContextuel.executerOption);
         // ajoute l'option pour modifier la taille du texte :
         let option = document.createElement("DIV");
         option.append("Taille du texte");
         let btn = document.createElement("BUTTON");
         btn.append("+");
-        btn.dataset.modificationCss = "tailleTextePlus";
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "tailleTextePlus";
         option.append(btn);
         btn = document.createElement("BUTTON");
         btn.append("-");
-        btn.dataset.modificationCss = "tailleTexteMoins";
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "tailleTexteMoins";
         option.append(btn);
         menu.append(option);
         // ajoute l'option pour modifier l'épaisseur du cadre :
@@ -100,11 +130,13 @@ const menuContextuel = {
         option.append("Epaisseur du cadre");
         btn = document.createElement("BUTTON");
         btn.append("+");
-        btn.dataset.modificationCss = "epaisseurCadrePlus";
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "epaisseurCadrePlus";
         option.append(btn);
         btn = document.createElement("BUTTON");
         btn.append("-");
-        btn.dataset.modificationCss = "epaisseurCadreMoins";
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "epaisseurCadreMoins";
         option.append(btn);
         menu.append(option);
         // ajoute l'option pour modifier la couleur d'arrière-plan :
@@ -113,8 +145,9 @@ const menuContextuel = {
         btn = document.createElement("INPUT");
         btn.setAttribute("type", "color");
         btn.setAttribute("value", "#000000");
-        btn.dataset.modificationCss = "couleurArrPlan";
-        btn.addEventListener("input", menuContextuel.modifierCSS);  // evt input => chng couleur même si le sélecteur est ouvert
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "couleurArrPlan";
+        btn.addEventListener("input", menuContextuel.executerOption);  // evt input => chng couleur même si le sélecteur est ouvert
         option.append(btn);
         menu.append(option);
         // ajoute l'option pour modifier la couleur du texte :
@@ -123,21 +156,34 @@ const menuContextuel = {
         btn = document.createElement("INPUT");
         btn.setAttribute("type", "color");
         btn.setAttribute("value", "#000000");
-        btn.dataset.modificationCss = "couleurTexte";
-        btn.addEventListener("input", menuContextuel.modifierCSS);  // evt input => chng couleur même si le sélecteur est ouvert
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "couleurTexte";
+        btn.addEventListener("input", menuContextuel.executerOption);  // evt input => chng couleur même si le sélecteur est ouvert
         option.append(btn);
         menu.append(option);
         // ajoute l'option pour supprimer le bloc de texte :
         option = document.createElement("DIV");
         btn = document.createElement("BUTTON");
         btn.append("Supprimer le texte");
-        btn.dataset.modificationCss = "supprTexte";
+        btn.dataset.type = "styleCSS";
+        btn.dataset.action = "supprTexte";
         option.append(btn);
         menu.append(option);
+        // ajoute une ligne horizontale pour séparer les ensembles d'options :
+        option = document.createElement("HR");
+        menu.append(option);
+        // ajoute l'option pour capture une partie de l'image (capture d'écran) :
+        option = document.createElement("DIV");
+        btn = document.createElement("BUTTON");
+        btn.dataset.type = "captureEcran";
+        btn.dataset.action = "creer";
+        btn.append("Capture");
+        option.append(btn);
+        menu.append(option);      
         // ajoute le menu contextuel à la page :
         document.body.append(menu);
     },
-
+    
     cacher : function(evt) {
         /*  La fonction est appelée par l'évènement "mouseleave" sur le menu contextuel pour cacher ce dernier. 
             evt.currentTarget est le menu contextuel sur lequel l'évènement a été enregistré. Cette propriété
@@ -152,78 +198,96 @@ const menuContextuel = {
             Le menu contextuel standard est remplacé par un menu permettant de modifier le style d'un ou 
             plusieurs blocs de texte. 
             L'évènement "contextmenu" se produit en un point de coordonnées (x,y) pour ouvrir le menu contextuel, qui 
-            est représenté par un bloc <div> où (x,y) sont les coordonnées du coin en haut à gauche. Le menu est caché 
+            est représenté par un bloc <div>, où (x,y) sont les coordonnées du coin en haut à gauche. Le menu est caché 
             lorsque le pointeur de la souris le quitte. Ce mécanisme nécessite une précision de l'ordre du pixel. 
             Cependant, le menu est parfois caché immédiatement après son affichage, car le pointeur de la souris a bougé 
             involontairement. Pour être certain d'ouvrir le menu en incluant le pointeur de la souris, les coordonnées 
-            du coin en haut à gauche sont (x - 10, y - 10). */
+            du coin en haut à gauche sont (x - 10, y - 10). 
+            Les propriétés window.scrollX et window.scrollY permettent de prendre en compte les scrolls qui ont eu lieu
+            sur la page. */
         evt.preventDefault();  // le menu contextuel standard n'est pas affiché
         evt.stopPropagation();
-        let menu = document.getElementById("menuContextuelTexte");
+        let menu = document.getElementById("menuContextuel");
         menu.classList.replace("cacher", "afficher");  // le menu est affiché
         let i = Math.round(evt.clientY + window.scrollY) - 10;
         menu.style.top = i > 0 ? i.toString() + "px" : "0px";  // fixe la position Y, qui ne doit pas être < 0
         i = Math.round(evt.clientX + window.scrollX) - 10;
         menu.style.left = i > 0 ? i.toString() + "px" : "0px";  // fixe la position X, qui ne doit pas être < 0
-        if (evt.currentTarget.tagName !== "IMG") {  // le menu n'est pas ouvert depuis l'image
+        if (evt.currentTarget.tagName !== "CANVAS") {  // le menu n'est pas ouvert depuis l'image
             menuContextuel.blocTexte = evt.currentTarget;  // donc il est ouvert depuis un bloc de texte, qui est enregistré
         }
     },
     
-    modifierCSS : function(evt) {
-        /*  Cette fonction est appelée par un "click" sur le menu contextuel pour modifier le CSS d'un ou plusieurs
-            blocs de texte. 
-            L'attribut data-modificationCss de la cible est le nom de la fonction qui définit la modification du CSS à appliquer.
+    executerOption : function(evt) {
+        /*  Cette fonction est appelée par un "click" sur le menu contextuel pour exécuter l'option qui a été choisie.
+            Les attributs data-<...> des boutons :
+            L'attribut data-type identifie si l'action porte sur le texte ou sur la capture d'écran.
+            L'attribut data-action de la cible est le nom de la fonction qui implémente une option.
+            La gestion des styles :
             Le style est dans la propriété <bloc de texte>.style.<css>, où <css> est la propriété css. 
             Si elle est en plusieurs parties séparées par des '-', alors chacun est supprimé et la 1ère lettre
             de la partie suivante est en majuscule (exemple : "border-width" devient "borderWidth"). 
+            
             Si menuContextuel.blocTexte = null alors le menu contextuel est ouvert mais il ne se rapporte
             pas à un bloc de texte en particulier ; par conséquent, les modifications vont s'appliquer à
             tous les blocs de texte. */
         evt.stopPropagation();
-        if (menuContextuel.blocTexte) {  // le menu se rapporte à un bloc de texte auquel s'applique les modifications
-            menuContextuel[evt.target.dataset.modificationCss](menuContextuel.blocTexte, evt);
-        }
-        else {  // le menu est ouvert depuis <img>, donc les modifications s'appliquent à tous les blocs de texte
-            for (let b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
-                menuContextuel[evt.target.dataset.modificationCss](b, evt);
-            }
+        switch (evt.target.dataset.type) {
+            case "captureEcran":
+                captureEcran[evt.target.dataset.action](evt);
+                break;
+                
+            case "styleCSS":
+                if (menuContextuel.blocTexte) {  // le menu se rapporte à un bloc de texte auquel s'applique les modifications
+                    menuContextuel[evt.target.dataset.action](menuContextuel.blocTexte, evt);
+                }
+                else {  // le menu est ouvert depuis <img>, donc les modifications s'appliquent à tous les blocs de texte
+                    for (let b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
+                        menuContextuel[evt.target.dataset.action](b, evt);
+                    }
+                }
+                break;
+                
+            default:
+                break;
         }
     },
     
     tailleTextePlus : function(b) {
-        /*  Incrémente de 1em la taille du texte du bloc b. */
+        /*  Incrémente de 2px la taille du texte du bloc b. */
         let t = Number.parseInt(b.style.fontSize);  // la taille actuelle du texte
-        // si t = NaN alors la taille n'existe pas, donc t = 1 d'après le style font-size sur <body>
-        b.style.fontSize = Number.isNaN(t) ? "2em" : (t + 1).toString() + "em";
+        // si t = NaN alors la taille n'existe pas, donc t = 16 d'après le style font-size sur <body>
+        b.style.fontSize = Number.isNaN(t) ? (tailleTexteDefaut + 2).toString() + "px" : (t + 2).toString() + "px";
     },
     
     tailleTexteMoins : function(b) {
-        /*  Décrémente de 1em la taille du texte du bloc b. */
+        /*  Décrémente de 2px la taille du texte du bloc b. */
         let t = Number.parseInt(b.style.fontSize);  // la taille actuelle du texte
-        /*  Si t = NaN alors la taille n'existe pas, donc t = 1 d'après le style font-size sur <body>.
+        /*  Si t = NaN alors la taille n'existe pas, donc t = 16 d'après le style font-size sur <body>.
             Par conséquent, la taille n'est pas décrémentée. */                
-        if (!Number.isNaN(t) && t > 1) {  // la taille est décrémentée si elle est > 1
-            b.style.fontSize = (t - 1).toString() + "em";
+        if (!Number.isNaN(t) && t > tailleTexteDefaut) {  // la taille est décrémentée si elle est > 16
+            b.style.fontSize = (t - 2).toString() + "px";
         }
     },
     
     epaisseurCadrePlus : function(b) {
-        /*  La bordure du bloc b est incrémentée de 2px. */
+        /*  La bordure du bloc b est incrémentée de 2px. 
+            La propriété border-width est automatiquement remplacée par border-top-width, border-right-width,
+            border-bottom-widht et border-left-width. */
         let t = Number.parseInt(b.style.borderWidth);  // l'épaisseur actuelle du cadre
         // si t = NaN alors l'épaisseur n'existe pas, donc t = 2
-        b.style.borderWidth = Number.isNaN(t) ? "2px" : (t + 2).toString() + "px";  
+        b.style.borderWidth = Number.isNaN(t) ? epaisseurBordure.toString() + "px" : (t + epaisseurBordure).toString() + "px";  
     },
     
     epaisseurCadreMoins : function(b) {
-        /*  La bordure du bloc b est décrémentée de 2px. */
+        /*  La bordure du bloc b est décrémentée de epaisseurBordure px. */
         let t = Number.parseInt(b.style.borderWidth);  // l'épaisseur actuelle du cadre
         /*  Si t = NaN alors l'épaisseur n'existe pas, donc on suppose que t = 1px. */
         if (Number.isNaN(t)) {  // l'épaisseur devient égale à 0 ; donc, la bordure disparaît
             b.style.borderWidth = "0px";
         }
-        else if (t >= 2) {  // la taille est décrémentée de 2px si elle est >= 2
-            b.style.borderWidth = (t - 2).toString() + "px";
+        else if (t >= epaisseurBordure) {  // la taille est décrémentée de epaisseurBordure px si elle est >= epaisseurBordure
+            b.style.borderWidth = (t - epaisseurBordure).toString() + "px";
         }
     },
     
@@ -246,33 +310,240 @@ const menuContextuel = {
 }
 
 
+const captureEcran = {
+
+    selection : false,  // le rectangle pour border la zone à séléectioner est en cours de création 
+    rect : null,  // le bloc délimitant le rectangle à capturer
+    rectX : 0,  // l'abscisse du coin en haut à gauche
+    rectY : 0,  // l'ordonnée du coin en haut à gauche
+    rectW : 0,  // la largeur de la surface
+    rectH : 0,  // la hauteur de la surface
+    
+    executer : function(evt) {
+        /*  Remplace les blocs de texte en les dessinant dans le <canvas>, permet de sélectionner une partie
+            de l'image et de copier cette image dans le presse-papier. */
+    },
+    
+    creer : function(evt) {
+        /*  Prendre une copie d'une partie de l'écran.
+            Pour sélectionner la partie de l'écran à capturer dans un rectangle, les coordonnées du coin supérieur/gauche
+            sont marquées par celles du 1er évènement "mousedown". En maintenant le bouton de la souris appuyé, le curseur
+            est déplacé vers le coin inférieur/droit ; l'évènement "mousemove" renvoie les coordonnées du curseur pour tracer
+            un rectangle temporaire avec le coin supérieur/gauche. Lorsque le bouton de la souris est relâché, l'évènement 
+            "mouseup" est déclenché et ses coordonnées sont celles du coin inférieur/droit. 
+            D'une part, cela implique l'interruption de l'écoute des évènements qui déplacent un bloc de texte.
+            D'autre part, si ces évènements sont écoutés sur le rectangle alors la sélection risque d'être stoppée puisque 
+            le curseur doit rester sur la bordure du rectangle ; par conséquent, l'écoute est réalisée sur <BODY> qui est 
+            l'ascendant du rectangle.
+            L'id du rectangle est "captureRect". */
+        // interrompt l'écoute des évènement "mousedown", "mousemove" et "mouseup" sur les blocs de texte :
+        for (let b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
+            b.removeEventListener("mousedown", deplacement.commencer);
+            b.removeEventListener("mousemove", deplacement.poursuivre);
+            b.removeEventListener("mouseup", deplacement.terminer);
+        }
+        // Remplace les blocs de texte en les dessinant dans le <CANVAS> :
+        captureEcran.dessinerTexte();
+        // écoute les évènement "mousedown", "mousemove" et "mouseup" sur <body> :
+        document.body.addEventListener("mousedown", captureEcran.commencer);
+        document.body.addEventListener("mousemove", captureEcran.selectionner);
+        document.body.addEventListener("mouseup", captureEcran.terminer);
+    },
+
+    commencer : function(evt) {
+        /*  L'évènement "mousedown" marque le début de la création du rectangle qui définit la zone de l'image
+            à capturer.. 
+            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown", puis "contextmenu". */
+        evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
+        if (evt.button === 2) {  // appel au menu contextuel avec la souris
+            return;              // donc ce n'est pas le début de la création du rectangle
+        }
+        captureEcran.selection = true;  // marque le début de la sélection
+        captureEcran.rectX = evt.clientX + window.scrollX;
+        captureEcran.rectY = evt.clientY + window.scrollY;
+        captureEcran.rect = document.createElement("DIV");
+        captureEcran.rect.id = "captureRect";
+        captureEcran.rect.style.position = "absolute";
+        captureEcran.rect.style.border = "3px solid black";
+        captureEcran.rect.style.left = captureEcran.rectX.toString() + "px";
+        captureEcran.rect.style.top = captureEcran.rectY.toString() + "px";
+        document.body.append(captureEcran.rect);
+    },
+    
+    selectionner : function(evt) {
+        /*  La sélection continue avec l'évènement "mousemove". */
+        evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
+        if (captureEcran.selection) {  // la sélection a commencé
+            captureEcran.rectW += evt.movementX;  // ajoute l'écart l'ancienne position en x, du pointeur de la souris
+            captureEcran.rectH += evt.movementY;  // ajoute l'écart l'ancienne position en y, du pointeur de la souris
+            captureEcran.rect.style.width = captureEcran.rectW.toString() + "px";
+            captureEcran.rect.style.height = captureEcran.rectH.toString() + "px";
+        }
+    },
+    
+    terminer : function(evt) {
+        /*  L'évènement "mouseup" marque la fin de la création du rectangle qui sélectionne la partie de l'image
+            à capturer. Cette dernière donne sa taille au <canvas>, puis remplace l'image précédente. 
+            Important : 
+            En redéfinissant la taille du canvas, l'ancienne image est effacée.
+            La taille doit être redéfinie avant de copier la nouvelle image. */
+        evt.stopPropagation();  // inutile de propager l'évènement de déplacement
+        captureEcran.selection = false;  // marque la fin de la sélection
+        // stoppe l'écoute des évènement "mousedown", "mousemove" et "mouseup" sur le <body> :
+        document.body.removeEventListener("mousedown", captureEcran.commencer);
+        document.body.removeEventListener("mousemove", captureEcran.selectionner);
+        document.body.removeEventListener("mouseup", captureEcran.terminer);
+        // remplace l'image du <canvas> par la sélection :
+        let c = document.getElementById("canvas");
+        let ctx = c.getContext("2d");
+        let nvImg = ctx.getImageData(captureEcran.rectX, captureEcran.rectY, captureEcran.rectW, captureEcran.rectH);
+        c.width = captureEcran.rectW;  // redéfinit la largeur du <canvas>
+        c.height = captureEcran.rectH;  // redéfinit la hauteur du <canvas>
+        //ctx.clearRect(0, 0, c.width, c.height);  // efface l'image du canvas
+        ctx.putImageData(nvImg, 0, 0);  // la partie de l'image qui a été sélectionnée est mise dans le canvas
+        document.getElementById("captureRect").remove();  // le cadre représentant la surface est supprimé
+        // réinitialise les paramètres de la capture :
+        captureEcran.rect = null;
+        captureEcran.rectX = 0;
+        captureEcran.rectY = 0;
+        captureEcran.rectW = 0;
+        captureEcran.rectH = 0; 
+        // copie l'image dans le presse-papier :
+        captureEcran.copier();
+    },
+    
+    copier : function(evt) {
+        /*  L'image du canvas est copiée dans le presse-papier. */
+        document.getElementById("canvas").toBlob(  // transforme le <CANVAS> en <IMG>
+            function(blob) {
+                let img = new ClipboardItem({ [blob.type] : blob });
+                navigator.clipboard.write([img])
+                /*  Il y aura une exception si le DOM n'a pas le focus ; cela se produit lorsque les outils de développement
+                    sont ouverts avec une session de debug en même temps, par exemple.
+                    Je ne parviens pas à rendre le focus au document dans le cas cité en exemple. 
+                    L'exception ne se produit pas lorsque le panneau latéral est affiché. */
+                .then(
+                    function() {
+                        /*  L'image est copiée dans le presse-papier. */
+                    }
+                )
+                .catch(
+                    function(err) {
+                        afficherErreur("L'écriture dans le presse-papier a échoué : " + err.name + ", " + err.message);
+                    }
+                );
+            }
+        );
+    },
+    
+    dessinerTexte : function() {
+        /*  Les blocs <div> de texte sont dessinés sur le <canvas>.
+            1er cas : il y a une seule ligne de texte
+            La propriété .textContent renvoie cette ligne
+            2ème cas : il y a plusieurs lignes de texte
+            Si le bloc de texte n'est pas assez large alors le saut de ligne est automatique, mais le texte est
+            un seul élément texte ou <div>. A priori, la méthode fillText() prend en paramètre maxWidth, qui est la largeur
+            max du texte et gère ainsi les sauts.
+            Sinon, les sauts de ligne sont créés volontairement avec ENTREE. Dans ce cas, chaque ligne est un élément <div>.
+            Bien sûr, ces 2 cas ne sont pas exclusifs.
+            D'après mes tests, ce sont les 2 seuls cas. Cela impique que le bloc principal de texte n'a que des fils, qui
+            sont des noeuds texte ou des éléments <div>. 
+            
+            Le bloc de texte est un élément <DIV> dont les coordonnées du coin en haut à gauche sont (x, y). Ce <DIV> a une
+            largeur width et une hauteur height. La bordure est incluse dans ce bloc, qui a aussi une propriété padding.
+            Dans le <CANVAS>, la bordure est dessinée autour d'un rectangle avec stokeRect() ; cela implique que :
+            - Les coordonnées du coin en haut à gauche sont (x + <epaisseur bordure>, y + <épaisseur bordure>).
+            - La largeur est (width - <épaisseur bordure>).
+            - La hauteur est (height - <épaisseur bordure>).
+            L'arrière-plan est ensuite coloré avec fillRect() qui représente un rectangle ayant les mêmes dimensions.
+            
+            Le padding est l'écart entre la bordure et le texte.
+            Dans le DOM, la hauteur d'une ligne est : facteurHauteurLigne * <taille de la police>. Cette mesure n'est pas reproductible
+            dans le <canvas> car fillText(texte, x, y) dessine 1 ligne de texte positionnée au dessus du point (x, y).
+            Par conséquent, on doit calculer la hauteur de l'interligne :
+            (facteurHauteurLigne * <taille de la police> - <taille de la police>) / 2.
+            Cela implique que la 1ère ligne commence au point (x + <epaisseur bordure> + padding + interligne, 
+            y + <épaisseur bordure> + padding).
+            L'ordonnée des lignes suivantes est obtenue en ajoutant : <taille de la police> + interligne.
+                      
+            Notes : 
+            rgba(0,0,0,0) = fond transparent
+            La méthode fillText() dessine 1 ligne de texte même si le texte inclut des sauts de ligne.
+            strokeRect(x, y, largeur, hauteur) : les bords sont autour du rectange, ils ne sont pas inclus dedans. 
+            <contexte 2D du canvas>.lineWidth est l'épaisseur de la bordure des rectanges. D'après  la documentation, 
+            cette propriété ignore la valeur 0 et la remplace toujours par 1. Cela implique que lorsque l'épaisseur de 
+            la bordure est nulle, la bordure du rectangle ne doit pas être dessinée, sinon elle serait visible. 
+            Toutes ces mesures sont modifiées avec le scroll horizontal et vertical. */
+        var rect;  // rectangle représentant un bloc de texte ou une ligne de texte
+        var ctx = document.getElementById("canvas").getContext("2d");
+        var b, li, tt, texteY, eb, texteX; 
+        ctx.strokeStyle = "black";  // le couleur de la bordure des blocs de texte
+        for (b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
+            rect = b.getBoundingClientRect();  // les coord et les dimensions du bloc principal de texte
+            ctx.font = (b.style.fontSize) ? b.style.fontSize + " sans-serif" : 
+            tailleTexteDefaut.toString() + "px sans-serif";  // taille du texte et police pour le <CANVAS>
+            eb = Number.parseInt(b.style.borderTopWidth);  // l'épaisseur (1px par défaut)
+            if (eb > 0) {  // la bordure existe
+                ctx.lineWidth = eb;  // enreg l'épaisseur dans le contexte 2D du canvas
+                ctx.strokeRect(rect.x + window.scrollX + eb, rect.y + window.scrollY + eb, rect.width - eb, 
+                rect.height - eb);  // dessine les bords du rectangle            
+            }  // sinon l'épaisseur est nulle (tt = 0) et ctx.lineWidth = 1 (valeur par défaut)
+            ctx.fillStyle = (b.style.backgroundColor) ? b.style.backgroundColor : "rgba(0,0,0,0)";  // couleur d'arrière-plan
+            ctx.fillRect(rect.x + window.scrollX + eb, rect.y + window.scrollY + eb, 
+            rect.width - eb, rect.height - eb);  // dessine le rect et son arrière-plan
+            ctx.fillStyle = (b.style.color) ? b.style.color : "black";  // la couleur du texte
+            tt = (b.style.fontSize) ? Number.parseInt(b.style.fontSize) : tailleTexteDefaut;  // la taille du texte
+            tt += Math.floor((tt * facteurHauteurLigne - tt) / 2);  // ajoute la hauteur de l'interligne 
+            texteY = rect.y + window.scrollY + eb + paddingTexte + tt;  // l'ordonnée d'une ligne de texte
+            texteX = rect.x + window.scrollX + eb + paddingTexte;  // l'abscisse des lignes du texte
+            for (li of b.childNodes) {  // pour chaque ligne de texte
+                ctx.fillText(li.textContent, texteX, texteY);
+                texteY += tt;  // la prochaine ligne de texte sera écrite en dessous
+            }
+            b.remove();  // supprime le bloc de texte <div> du flux du document
+        }
+    }
+
+}
+
+
 function collerImage(imagePP) {
-    /*  L'image du presse-papier (imagePP) est collée dans un <img>. */
+    /*  L'image du presse-papier (imagePP) est collée dans un <CANVAS>. */
     imagePP.getType(imagePP.types[0])  // imagePP.types[0] = type MIME des données du presse-papier
     .then(
         function(blob) {
-            let f = document.createDocumentFragment();
-            f.append(document.createElement("IMG"));
-            f.children[0].addEventListener("load", imageDispo);  // capte la fin du chargement de l'image
-            f.children[0].src = URL.createObjectURL(blob);  // src = adr de l'image stockée par le navigateur
-            document.body.append(f);
+            /*  blob : les données constituant l'image */
+            createImageBitmap(blob)  // https://developer.mozilla.org/en-US/docs/Web/API/createImageBitmap
+            .then(
+                function(bmp) {
+                    /*  Le canvas doit avoir exactement la taille en pixels de l'image à coller, sinon elle est déformée :
+                        https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage (i).
+                    */
+                    let c = document.createElement("CANVAS");  // le canvas qui va recevoir l'image du press-papier
+                    c.id = "canvas";
+                    c.width = bmp.width;  // voir (i)
+                    c.height = bmp.height;  // voir (i)
+                    c.getContext("2d").drawImage(bmp, 0, 0) ;
+                    c.addEventListener("dblclick", ajouterTexte);
+                    c.addEventListener("contextmenu", menuContextuel.afficher);
+                    document.body.style.width = bmp.width.toString() + "px";
+                    document.body.style.height = bmp.height.toString() + "px";
+                    document.body.append(c);
+                }
+            )
+            .catch(
+                function(err) {
+                    afficherErreur("Erreur avec createImageBitmap() :" + err);
+                }
+            );
+                
         }
     )
     .catch(
         function(err) {
             afficherErreur("Impossible de coller l'image : " + err);
         }
-    )
-}
-
-
-function imageDispo(evt) {
-    /*  La fonction est appelée par l'évènement "load" sur l'élément <img> ; c'est à dire, lorsque l'image 
-        est disponible. */
-    URL.revokeObjectURL(evt.target.src);  // libère l'image de la mémoire, car cette image va être modifiée
-    evt.target.removeEventListener("load", imageDispo);  // suppr la gestion de l'évènement "load"
-    evt.target.addEventListener("dblclick", ajouterTexte);
-    evt.target.addEventListener("contextmenu", menuContextuel.afficher);
+    );
 }
 
 
@@ -292,34 +563,37 @@ function ajouterTexte(evt) {
         les autres blocs. */
     evt.stopPropagation();
     let div = document.createElement("DIV");
-    div.classList.add("blocTexte");
+    div.classList.add("blocTexte");  // la classe définit le positionnement
     div.style.top = Math.round(evt.pageY).toString() + "px";
     div.style.left = Math.round(evt.pageX).toString() + "px";
+    div.style.border = "2px solid black";  // ajoute une bordure par défaut
     div.setAttribute("contenteditable", "true");
     div.addEventListener("mousedown", deplacement.commencer);
     div.addEventListener("mousemove", deplacement.poursuivre);
     div.addEventListener("mouseup", deplacement.terminer);
     div.addEventListener("mouseleave", deplacement.terminer);
     div.addEventListener("contextmenu", menuContextuel.afficher);
-    document.getElementById("menuContextuelTexte").before(div);
+    document.getElementById("menuContextuel").before(div);
 }
 
 
 const deplacement = {  // groupe les fonctions qui gèrent le déplacement des blocs de texte
-    /*  Un bloc de texte de texte est un élément <div>. Déplacer cet élément revient à modifier les coordonnées 
+    /*  Un bloc de texte est un élément <div>. Déplacer cet élément revient à modifier les coordonnées 
         du coin en haut à gauche (x, y).
         Pour commencer le déplacement d'un bloc de texte, on clique dessus en un point ; puis, le déplacement 
         se poursuit en faisant glisser le pointeur. Cette action est captée par l'évènement "mousemove", dont 
         les propriétés "movementX" et "movementY" enregistrent les écarts avec l'abscisse et l'ordonnée précédentes 
         du pointeur.
-        Donc, la nouvelle position du coin supérieur gauche est : (x + "movementX", y + "movementY"). */
+        Donc, la nouvelle position du coin supérieur gauche est : (x + "movementX", y + "movementY").
+        Les propriétés window.scrollX et window.scrollY permettent de prendre en compte les scrolls qui ont eu lieu
+        sur la page. */
     poursuite : false,  
     x : 0,  // la valeur de la propriété "left" du coin supérieur gauche de <div>
     y : 0,  // la valeur de la propriété "top" du coin supérieur gauche de <div>
     
     commencer : function(evt) {
         /*  Le déplacement commence avec l'évènement "mousedown". 
-            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown" puis "contextmenu". */
+            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown", puis "contextmenu". */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
         if (evt.button === 2) {  // appel au menu contextuel avec la souris
             return;              // donc ce n'est pas le début du déplacement
