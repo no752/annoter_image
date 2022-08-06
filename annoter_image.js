@@ -64,7 +64,7 @@ navigator.permissions.query({ name: "clipboard-read" })
         )
         .catch(  // l'utilisateur a refusé la lecture
             function(err) {
-                afficherErreur("L'utilisateur a refusé la permission de lire le presse-papier.");
+                afficherErreur("L'utilisateur a refusé la permission de lire le presse-papier :" + err);
             }
         );
     }
@@ -311,7 +311,13 @@ const menuContextuel = {
 
 
 const captureEcran = {
-
+    /*  Que représentent "viewport", "layout viewport" et "visual viewport" ?
+        Le "viewport" et le "layout viewport" sont équivalents.
+        Le "viewport" inclut le document qui a été dessiné dans une fenêtre ou dans l'écran en mode plein écran.
+        Le "visual viewport" est la partie visible du "viewport".
+        Par défaut, la sélection de la zone à capturer est réalisée en mode plein écran. Néanmoins, l'utilisateur
+        peut revenir à l'affichage dans une fenêtre avant de commencer la sélection.
+        window.scrollX et window.scrollY mesurent le scroll en pixels dans le "viewport" (la mesure est de type float). */
     _selection : false,  // le rectangle pour border la zone à séléectioner est en cours de création 
     _rect : null,  // le bloc délimitant le rectangle à capturer
     _rectX : 0,  // l'abscisse du coin en haut à gauche
@@ -341,7 +347,9 @@ const captureEcran = {
     },
     
     _creer : function() {
-        /*  Prendre une copie de la partie qui a été sélectionnée,  dans l'écran.
+        /*  Prendre une copie de la partie qui a été sélectionnée sur l'écran.
+            Ce dernier est en mode plein écran par défaut ; néanmoins, l'utilisateur peut revenir dans une fenêtre
+            pour sélectionner la zone à capturer.
             Pour sélectionner la partie de l'écran à capturer dans un rectangle, les coordonnées du coin supérieur/gauche
             sont marquées par celles du 1er évènement "mousedown". En maintenant le bouton de la souris appuyé, le curseur
             est déplacé vers le coin inférieur/droit ; l'évènement "mousemove" renvoie les coordonnées du curseur pour tracer
@@ -353,7 +361,8 @@ const captureEcran = {
             l'ascendant du rectangle.
             L'id du rectangle est "captureRect". 
             La sélection ne permet de faire défiler automatiquement l'écran pour étendre la zone à des parties invisibles. 
-            Cela implique que le mode plein écran est activé avant la sélection.*/
+            Cela implique que le mode plein écran est activé avant la sélection.
+            */
             
         // interrompt l'écoute des évènement "mousedown", "mousemove" et "mouseup" sur les blocs de texte :
         for (let b of document.querySelectorAll(".blocTexte")) {  // b : un bloc de texte
@@ -372,7 +381,10 @@ const captureEcran = {
     _commencer : function(evt) {
         /*  L'évènement "mousedown" marque le début de la création du rectangle qui définit la zone de l'image
             à capturer.. 
-            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown", puis "contextmenu". */
+            Néanmoins, le click-droit (menu contextuel) déclenche les évènements "mousedown", puis "contextmenu". 
+            Initialisation de captureEcran._rectX et captureEcran._rectY :
+            Si le mode plein écran est actif alors window.scrollX et window.scrollY sont toujours nuls. Sinon, 
+            l'écran est affiché dans une fenêtre ; dans ce cas, _rectX et _rectY doivent inclure le scroll. */
         evt.stopPropagation();  // inutile de propager l'évènement de déplacement, puisqu'il ne concerne que le bloc de texte
         if (evt.button === 2) {  // appel au menu contextuel avec la souris
             return;              // donc ce n'est pas le début de la création du rectangle
@@ -382,8 +394,8 @@ const captureEcran = {
         captureEcran._rectY = evt.clientY + window.scrollY;
         captureEcran._rect = document.createElement("DIV");
         captureEcran._rect.id = "captureRect";
-        captureEcran._rect.style.position = "absolute";
-        captureEcran._rect.style.border = "3px solid black";
+//        captureEcran._rect.style.position = "fixed";
+//        captureEcran._rect.style.border = "3px solid black";
         captureEcran._rect.style.left = captureEcran._rectX.toString() + "px";
         captureEcran._rect.style.top = captureEcran._rectY.toString() + "px";
         document.body.append(captureEcran._rect);
@@ -535,7 +547,6 @@ const captureEcran = {
             b.remove();  // supprime le bloc de texte <div> du flux du document
         }
     }
-
 }
 
 
