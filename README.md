@@ -2,7 +2,7 @@
 Le but est de coller une image dans un page html pour positionner des blocs de texte représentant des annotations. Une partie de l'image est ensuite sélectionnée pour être placée dans le presse-papier afin d'être collée dans une autre application.
 # Comment utiliser l'application ?
 1. Placer une image dans le presse-papier avec la touche "Impr écran".
-2. Ouvrir l'application : l'image est immédiatement collée en accordant l'autorisation.
+2. Ouvrir l'application : avec edge, l'image est immédiatement collée en accordant l'autorisation ; avec chrome, l'utilisateur doit d'abord cliquer sur un bouton pour coller l'image.
 3. Créer des blocs de texte sur l'image en double cliquant.
 4. Ces blocs sont déplaçables avec un glisser/déposer.
 5. Un click-droit sur un bloc ouvre un menu contextuel pour modifier le style du texte.
@@ -21,6 +21,8 @@ Le point de départ est une image contenue dans le presse-papier.
 Cela implique que le script doit pouvoir accéder au presse-papier ; c'est impossible avec firefox :
 https://developer.mozilla.org/fr/docs/Web/API/Clipboard.
 D'après cette page, l'accès au presse-papier est supporté par chrome et edge seulement.
+Sur chrome, la lecture du presse-papier est déclenchée seulement par une action utilisateur, comme un click par exemple. Cela implique que l'application ne charge pas automatiquement l'image dès l'ouverture, lorsqu'elle est exécutée dans chrome.
+Ce comportement n'existe ni avec chromium, ni avec edge.
 # Installation
 Il suffit d'enregistrer les fichiers annoter_image.html et annoter_image.js dans le même dossier ; puis, d'ouvrir le premier fichier avec la dernière version de edge ou chrome.
 # Note
