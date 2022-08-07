@@ -14,13 +14,12 @@ facteurHauteurLigne = 1.5,  // hauteur d'une ligne = facteurHauteurLigne * taill
 epaisseurBordure = 2;  // l'épaisseur par défaut de la bordures des blocs de texte, en pixels
 
 /*  Si les styles CSS sont issus d'une feuille externe alors la propriété document.styleSheets[0].cssRules ne renvoie
-    pas les règles. Une solution est d'inclure les styles sont inclus dans la page html avec 
+    pas les règles. Une solution est d'inclure les styles dans la page html avec 
     <head>...<style> les styles </style>...</head>. Ma compréhension est que .cssRules ne fonctionne pas avec une feuille
     externe sur le domaine file:///. Donc, les styles sont gérés dans la page html. */ 
-//document.body.style.fontSize = tailleTexteDefaut + "px";  // la taille par défaut du texte est défini sur <BODY>
 
 creerCssDefaut();
-
+accederPressePapier();
 
 function creerCssDefaut() {
     /*  Définit des styles par défaut en fonction des constantes du script. 
@@ -32,48 +31,78 @@ function creerCssDefaut() {
     css[3].styleMap.set("padding", paddingTexte.toString() + "px");  // le padding des blocs de texte
 }
 
-// le navigateur a-t-il la permission de lire le presse-papier ?
-navigator.permissions.query({ name: "clipboard-read" })
-.then(
-    function(result) {  // la permission existe
-        if (result.state === "denied") {  // mais elle n'est pas accordée
-            throw "Le navigateur n'a pas la permission de lire le presse-papier.";
+
+function accederPressePapier(evt) {
+    /*  Le navigateur a-t-il la permission de lire le presse-papier ? 
+        Si evt existe alors la fonction a été appelée par l'evt "click" de l'utilisateur sur le bouton. */
+    if (evt) {  // l'evt existe, donc l'appel de la fonction a été déclenché par le bouton qui doit être enlevé
+        document.getElementById("accederPressePapier").remove();
+    }
+    navigator.permissions.query({ name: "clipboard-read" })
+    .then(
+        function(result) {  // le navigateur supporte l'API permissions avec "clipboard-read"
+            if (result.state === "denied") {  // mais le navigateur n'a pas la permission de lire le presse-papier
+                throw "Le navigateur n'a pas la permission de lire le presse-papier.";
+            }
+            /*  le navigateur accède au presse-papier ; si result.state = prompt alors clipboard.read() ouvre une popup 
+                pour demander à l'utilisateur d'accorder la permission. */
+            navigator.clipboard.read()  // lire le contenu du presse-papier
+            .then(  // l'utilisateur a autorisé la lecture
+                function(contenuPP) {  // contenuPP : les éléments du presse-papier (array d'objets clipboardItem)
+                    if (contenuPP.length === 0) {
+                        afficherErreur("Le presse-papier est vide.");
+                    }
+                    else if (contenuPP.length > 1) {
+                        afficherErreur("Il y a plusieurs éléments dans le presse-papier.");
+                    }
+                    else {  // il y a 1 élément dans le presse-papier 
+                        /*  Les types MIME d'une image :
+                            https://www.iana.org/assignments/media-types/media-types.xhtml#image */
+                        if (contenuPP[0].types[0].startsWith("image/")) {  // le type mime de l'élément indique une image
+                            menuContextuel.creer();
+                            collerImage(contenuPP[0]);
+                        }
+                        else {  // l'élément n'est pas une image
+                            afficherErreur("Le presse-papier contient un élément qui n'est pas une image.");
+                        }
+                    }
+                }
+            )
+            .catch(  // la lecture est refusée
+                function(err) {
+                    /*  Il y a 2 cas :
+                        1) Avec Chrome, la lecture du presse-papier doit être déclenchée par une action utilisateur,
+                        comme un click par exemple. 
+                        2) L'utilisateur a vraiment refusé l'autorisation ; donc l'application est interrompue.
+                        L'objet err permet d'identifier l'un des 2 cas. 
+                        Dans le 1er cas, err.name, err.message = SecurityError, Must be handling a user gesture to use custom clipboard.
+                        Dans le 2ème cas, err.name, err.message = NotAllowedError, Read permission denied.
+                        Donc, Si err.name contient "user gesture" alors on est dans le 1er cas ; sinon, c'est le 2ème cas. */
+                    if (err.message.toUpperCase().includes("USER GESTURE")) {  // c'est le 1er cas
+                        /*  Créer un bouton pour que l'utilisateur puisse accomplir une action en cliquant et récupérer
+                            le contenu du presse-papier. L'id de ce bouton est "accederPressePapier". Cela permettra de
+                            retrouver facilement ce bouton pour le supprimer. */
+                        let btn = document.createElement("BUTTON");
+                        btn.id = "accederPressePapier";
+                        btn.append("Cliquer ici pour coller l'image du presse-papier");
+                        btn.style.padding = "5rem";
+                        btn.style.fontSize = "3rem";
+                        btn.addEventListener("click", accederPressePapier);
+                        document.body.append(btn);
+                    }
+                    else { // c'est le 2ème cas
+                        afficherErreur("La lecture du presse-papier a échoué :" + err.name + ", " + err.message);
+                    }
+                }
+            );
         }
-        
-        navigator.clipboard.read()  // lire le contenu du presse-papier
-        .then(  // l'utilisateur a autorisé la lecture
-            function(contenuPP) {  // contenuPP : les éléments du presse-papier (array d'objets clipboardItem)
-                if (contenuPP.length === 0) {
-                    afficherErreur("Le presse-papier est vide.");
-                }
-                else if (contenuPP.length > 1) {
-                    afficherErreur("Il y a plusieurs éléments dans le presse-papier.");
-                }
-                else {  // il y a 1 élément dans le presse-papier 
-                    /*  Les types MIME d'une image :
-                        https://www.iana.org/assignments/media-types/media-types.xhtml#image */
-                    if (contenuPP[0].types[0].startsWith("image/")) {  // le type mime de l'élément indique une image
-                        menuContextuel.creer();
-                        collerImage(contenuPP[0]);
-                    }
-                    else {  // l'élément n'est pas une image
-                        afficherErreur("Le presse-papier contient un élément qui n'est pas une image.");
-                    }
-                }
-            }
-        )
-        .catch(  // l'utilisateur a refusé la lecture
-            function(err) {
-                afficherErreur("L'utilisateur a refusé la permission de lire le presse-papier :" + err);
-            }
-        );
-    }
-)
-.catch( 
-    function(err) {
-        afficherErreur(err);
-    }
-);
+    )
+    .catch(  // le navigateur ne supporte pas l'API permissions avec "clipboard-read"
+        function(err) {
+            afficherErreur(err);
+        }
+    );
+}
 
 
 function afficherErreur(err) {
@@ -394,8 +423,6 @@ const captureEcran = {
         captureEcran._rectY = evt.clientY + window.scrollY;
         captureEcran._rect = document.createElement("DIV");
         captureEcran._rect.id = "captureRect";
-//        captureEcran._rect.style.position = "fixed";
-//        captureEcran._rect.style.border = "3px solid black";
         captureEcran._rect.style.left = captureEcran._rectX.toString() + "px";
         captureEcran._rect.style.top = captureEcran._rectY.toString() + "px";
         document.body.append(captureEcran._rect);
